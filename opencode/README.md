@@ -26,26 +26,41 @@ The `touchdesigner-mcp` skill itself is packaged content and lives in the plugin
 opencode reads its configuration at startup, so a new or moved file needs a restart
 (the skill text itself is re-read per session).
 
-## Runtime wiring (one directory, no extract copy)
+## Runtime wiring (one directory — this clone *is* the server)
 
-TouchDesigner loads the component `/mcp_webserver_base` with `externaltox` =
-`/Users/konraddiesch/TouchDesigner/td-dc-visuals/../touchdesigner-mcp/mcp_webserver_base.tox`,
-and `td/import_modules.py` derives the module path from it
-(`os.path.dirname(externaltox) + "/modules"`). `~/TouchDesigner/touchdesigner-mcp` is
-therefore a **symlink** to this repository's `td/` — the checked-out source *is* the
-running server, with no second copy to keep in sync. The stored path is unchanged, so no
-TD re-import or `.toe` save was needed for the swap.
+TouchDesigner loads the component `/mcp_webserver_base`, whose `externaltox` par points at
+`td/mcp_webserver_base.tox` **in this clone**:
 
 ```
-~/TouchDesigner/touchdesigner-mcp -> ~/Code/touchdesigner-mcp/td
+externaltox = /Users/konraddiesch/Code/touchdesigner-mcp/td/mcp_webserver_base.tox
 ```
+
+`td/import_modules.py` derives the module path from it
+(`os.path.dirname(externaltox) + "/modules"`), so this checked-out source is the running
+server — there is no extract copy and no symlink to keep in sync. The old
+`~/TouchDesigner/touchdesigner-mcp` (a symlink to `td/` for one afternoon) and
+`touchdesigner-mcp.extract-v2.1.0` were removed on 2026-10-18, and the par value was
+persisted by saving the main `.toe` with an explicit path.
 
 Two consequences:
 
 - Editing a module here changes what a **fresh** import loads, but a running TD keeps the
-  already-imported modules in `sys.modules` — re-import Python (or restart TD) to pick the
-  change up, exactly as before. Conversely, `git checkout` of another branch does not
-  silently change the running server.
+  already-imported modules in `sys.modules`. Verified re-import recipe:
+
+  ```python
+  import sys
+  base = op('/mcp_webserver_base')
+  for k in list(sys.modules):
+      if k.split('.')[0] in ('mcp', 'utils', 'import_modules'):
+          del sys.modules[k]
+  base.op('import_modules').module.setup()
+  import mcp
+  print(mcp.__file__)   # -> <clone>/td/modules/mcp/__init__.py
+  ```
+
+  Conversely, `git checkout` of another branch does not silently change the running server
+  — the switch only becomes live after that re-import.
+
 - Build artifacts required at runtime are gitignored and must exist locally:
   `td/modules/td_server/openapi_server/openapi/openapi.yaml` (bundled spec — copied from the
   `v2.1.0` release, or `npm run gen:openapi` with full `npm ci`) and
