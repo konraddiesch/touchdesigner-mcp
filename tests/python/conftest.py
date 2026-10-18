@@ -29,6 +29,12 @@ class FakeOp:
 		self.name = path.rsplit("/", 1)[-1] or "root"
 		self.OPType = op_type
 		self.valid = True
+		# A COMP is the only operator that can have children, and TouchDesigner
+		# marks it in the type name — every COMP family ends in "COMP"
+		# (baseCOMP, geometryCOMP, containerCOMP). `get_nodes` guards on this
+		# before calling findChildren, so the stub has to answer it honestly or
+		# the guard is untestable.
+		self.isCOMP = op_type.upper().endswith("COMP")
 		# TouchDesigner only writes a prefixed line for an operator that has
 		# something to say, so an operator a test puts in a scene has a
 		# message of its own by default — on the errors stream only, since an
@@ -38,6 +44,28 @@ class FakeOp:
 		# `reports()` sets either stream explicitly.
 		self.errors = lambda recurse=True: "  Error: something"
 		self.warnings = lambda recurse=True: ""
+
+	def findChildren(self, name=None, depth=None):
+		"""Return registered operators that are descendants of this one.
+
+		Mirrors ``OP.findChildren`` closely enough to tell the two search
+		shapes apart: ``depth=1`` stays one level down, while omitting
+		``depth`` walks the whole subtree — the difference the ``get_nodes``
+		fix depends on. ``name`` is a glob matched against the child name.
+		"""
+
+		prefix = self.path.rstrip("/") + "/"
+		matches = []
+		for candidate in sorted(_fake_td.ops.values(), key=lambda op: op.path):
+			if not candidate.path.startswith(prefix):
+				continue
+			relative = candidate.path[len(prefix) :]
+			if depth is not None and relative.count("/") >= depth:
+				continue
+			if name is not None and not fnmatch.fnmatchcase(candidate.name, name):
+				continue
+			matches.append(candidate)
+		return matches
 
 	def without_streams(self):
 		"""Drop both message streams, as an older TouchDesigner build has."""
