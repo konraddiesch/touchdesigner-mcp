@@ -331,12 +331,17 @@ class TouchDesignerApiService(IApiService):
 		if parent_node is None or not parent_node.valid:
 			return error_result(f"Parent node not found at path: {parent_path}")
 
+		if not parent_node.isCOMP:
+			return error_result(
+				f"Parent node is not a COMP and has no children: {parent_path}"
+			)
+
 		if pattern:
 			log_message(
-				f"Calling parent_node.findChildren(name='{pattern}')",
+				f"Calling parent_node.findChildren(name='{pattern}', depth=1)",
 				LogLevel.DEBUG,
 			)
-			nodes = parent_node.findChildren(name=pattern)
+			nodes = parent_node.findChildren(name=pattern, depth=1)
 		else:
 			log_message("Calling parent_node.findChildren(depth=1)", LogLevel.DEBUG)
 			nodes = parent_node.findChildren(depth=1)
