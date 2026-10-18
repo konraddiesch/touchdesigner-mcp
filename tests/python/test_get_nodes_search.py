@@ -8,7 +8,9 @@ The pattern path called ``findChildren(name=pattern)`` with no ``depth``, so
 it walked the whole subtree — grandchildren and deeper — while the no-pattern
 path beside it passed ``depth=1``. Same call, same promise ("the nodes under
 this parent"), two different sets, decided only by whether the caller happened
-to pass a pattern. The fix passes ``depth=1`` on both paths.
+to pass a pattern. The fix passes ``depth=1`` on both paths. TouchDesigner's
+own docs give depth its meaning: "Children have depth 1, their children have
+depth 2, etc."
 
 Neither path checked that the parent was a COMP before calling
 ``findChildren`` on it. A TOP or a CHOP has no children, so the call could not
@@ -61,13 +63,14 @@ class TestAPatternStaysOneLevelDeep:
 	def test_no_pattern_also_stays_one_level(self, service, scene):
 		# The control for the test above: the path that already passed
 		# depth=1 must keep behaving identically, so the fix is a match and
-		# not a swap.
+		# not a swap. Compared as a set: TouchDesigner makes no ordering
+		# guarantee, so the assertion must not encode the stub's sort.
 		scene(
 			PARENT,
 			ops=(f"{PARENT}/kick", f"{PARENT}/snare", f"{PARENT}/snare/snare_deep"),
 		)
 
-		assert names(service.get_nodes(PARENT)) == ["kick", "snare"]
+		assert set(names(service.get_nodes(PARENT))) == {"kick", "snare"}
 
 	def test_a_pattern_that_matches_nothing_is_an_empty_list(self, service, scene):
 		# Not an error: "nothing here" and "wrong parent" are different
@@ -75,6 +78,15 @@ class TestAPatternStaysOneLevelDeep:
 		scene(PARENT, ops=(f"{PARENT}/kick",))
 
 		assert names(service.get_nodes(PARENT, pattern="nope*")) == []
+
+	def test_a_pattern_matches_case_insensitively(self, service, scene):
+		# TouchDesigner's wildcard matching is case-insensitive, so "SNARE*"
+		# has to reach the node named "snare". The stub mirrors that; this
+		# pins it so a future edit cannot quietly make the harness stricter
+		# than the thing it stands in for.
+		scene(PARENT, ops=(f"{PARENT}/snare",))
+
+		assert names(service.get_nodes(PARENT, pattern="SNARE*")) == ["snare"]
 
 
 class TestAParentThatCannotHaveChildren:

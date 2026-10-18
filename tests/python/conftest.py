@@ -51,7 +51,8 @@ class FakeOp:
 		Mirrors ``OP.findChildren`` closely enough to tell the two search
 		shapes apart: ``depth=1`` stays one level down, while omitting
 		``depth`` walks the whole subtree — the difference the ``get_nodes``
-		fix depends on. ``name`` is a glob matched against the child name.
+		fix depends on. ``name`` is a glob matched against the child name,
+		case-insensitively, as TouchDesigner's own pattern matching is.
 		"""
 
 		prefix = self.path.rstrip("/") + "/"
@@ -60,9 +61,15 @@ class FakeOp:
 			if not candidate.path.startswith(prefix):
 				continue
 			relative = candidate.path[len(prefix) :]
+			# An empty tail means `candidate` is this operator itself, which
+			# only the root path can produce (prefix "/"). Never a child.
+			if not relative:
+				continue
 			if depth is not None and relative.count("/") >= depth:
 				continue
-			if name is not None and not fnmatch.fnmatchcase(candidate.name, name):
+			if name is not None and not fnmatch.fnmatchcase(
+				candidate.name.lower(), name.lower()
+			):
 				continue
 			matches.append(candidate)
 		return matches
