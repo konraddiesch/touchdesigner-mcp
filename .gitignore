@@ -161,3 +161,6 @@ uv.lock
 
 # Python build metadata, written when the project is installed (e.g. `uv run`)
 *.egg-info/
+
+# Fork-local working area (konraddiesch) — never upstream, never committed
+.konrad/
