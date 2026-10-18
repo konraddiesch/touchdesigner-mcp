@@ -25,3 +25,29 @@ The `touchdesigner-mcp` skill itself is packaged content and lives in the plugin
 
 opencode reads its configuration at startup, so a new or moved file needs a restart
 (the skill text itself is re-read per session).
+
+## Runtime wiring (one directory, no extract copy)
+
+TouchDesigner loads the component `/mcp_webserver_base` with `externaltox` =
+`/Users/konraddiesch/TouchDesigner/td-dc-visuals/../touchdesigner-mcp/mcp_webserver_base.tox`,
+and `td/import_modules.py` derives the module path from it
+(`os.path.dirname(externaltox) + "/modules"`). `~/TouchDesigner/touchdesigner-mcp` is
+therefore a **symlink** to this repository's `td/` — the checked-out source *is* the
+running server, with no second copy to keep in sync. The stored path is unchanged, so no
+TD re-import or `.toe` save was needed for the swap.
+
+```
+~/TouchDesigner/touchdesigner-mcp -> ~/Code/touchdesigner-mcp/td
+```
+
+Two consequences:
+
+- Editing a module here changes what a **fresh** import loads, but a running TD keeps the
+  already-imported modules in `sys.modules` — re-import Python (or restart TD) to pick the
+  change up, exactly as before. Conversely, `git checkout` of another branch does not
+  silently change the running server.
+- Build artifacts required at runtime are gitignored and must exist locally:
+  `td/modules/td_server/openapi_server/openapi/openapi.yaml` (bundled spec — copied from the
+  `v2.1.0` release, or `npm run gen:openapi` with full `npm ci`) and
+  `td/modules/mcp/controllers/generated_handlers.py` (`node td/genHandlers.js`, needs the
+  `yaml` + `mustache` packages).
